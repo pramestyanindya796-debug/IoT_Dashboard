@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IoT Dashboard — ESP32 Suhu & Kelembapan</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="dashboard">
+
+  <!-- ===== HEADER ===== -->
+  <div class="header">
+    <div>
+      <div class="header-title">⚡ IoT MONITOR — ESP32</div>
+      <div class="header-sub">MQTT WebSocket · broker.hivemq.com · Sensor DHT11</div>
+    </div>
+    <div>
+      <div class="clock" id="clock">--:--:--</div>
+      <div class="clock-date" id="datestr">--</div>
+    </div>
+  </div>
+
+  <!-- ===== STATUS BAR ===== -->
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <div class="status-info">
+      <div class="status-val disconnected" id="statusText">Disconnected</div>
+      <div class="status-topic" id="topicInfo">Klik "Connect" untuk terhubung ke broker MQTT</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-connect" id="btnConnect" onclick="doConnect()">Connect</button>
+      <button class="btn btn-disconnect" id="btnDisconnect" onclick="doDisconnect()" disabled>Disconnect</button>
+      <button class="btn btn-reset" onclick="doReset()">Reset Relay</button>
+    </div>
+  </div>
+
+  <!-- ===== SENSOR CARDS ===== -->
+  <div class="sensor-grid">
+    <div class="sensor-card suhu">
+      <div class="sensor-label">Suhu Ruangan</div>
+      <div>
+        <span class="sensor-val suhu-cool" id="suhuVal">--</span><span class="sensor-unit">°C</span>
+      </div>
+      <div class="sensor-badge badge-cool" id="suhuBadge">Menunggu data...</div>
+    </div>
+    <div class="sensor-card hum">
+      <div class="sensor-label">Kelembapan Udara</div>
+      <div>
+        <span class="sensor-val hum-val" id="humVal">--</span><span class="sensor-unit">%</span>
+      </div>
+      <div class="sensor-badge badge-normal" id="humBadge">Menunggu data...</div>
+    </div>
+  </div>
+
+  <!-- ===== RELAY CONTROL ===== -->
+  <div class="control-section">
+    <div class="section-header">
+      <span class="section-title">Kontrol Relay / LED</span>
+      <div class="mode-toggle">
+        <button class="mode-btn active" id="modeManual" onclick="setMode('manual')">Manual</button>
+        <button class="mode-btn" id="modeAuto" onclick="setMode('auto')">Auto</button>
+      </div>
+    </div>
+    <div class="relay-grid" id="relayGrid"></div>
+    <div class="auto-note" id="autoNote">
+      Mode Auto aktif: Relay 1 akan menyala otomatis jika suhu ≥ 31°C dan mati jika suhu &lt; 26.9°C
+    </div>
+  </div>
+
+  <!-- ===== CHART ===== -->
+  <div class="chart-section">
+    <div class="section-header">
+      <span class="section-title">Grafik Real-Time</span>
+      <div class="chart-tabs">
+        <button class="chart-tab active" onclick="switchChart('suhu', this)">Suhu</button>
+        <button class="chart-tab" onclick="switchChart('hum', this)">Kelembapan</button>
+        <button class="chart-tab" onclick="switchChart('both', this)">Keduanya</button>
+      </div>
+    </div>
+    <div class="chart-legend" id="chartLegend">
+      <span><span class="legend-dot" style="background:#f87171"></span>Suhu (°C)</span>
+    </div>
+    <div style="position: relative; height: 240px;">
+      <canvas id="sensorChart" role="img" aria-label="Grafik suhu dan kelembapan real-time ESP32">
+        Grafik sensor IoT real-time
+      </canvas>
+    </div>
+  </div>
+
+  <!-- ===== HISTORY ===== -->
+  <div class="history-section">
+    <div class="section-header">
+      <span class="section-title">History Data</span>
+      <button class="btn btn-sm" style="color:var(--muted); border-color:var(--border);" onclick="clearHistory()">
+        Hapus Semua
+      </button>
+    </div>
+    <table class="history-table">
+      <thead>
+        <tr>
+          <th>Waktu</th>
+          <th>Suhu (°C)</th>
+          <th>Kelembapan (%)</th>
+          <th>Status Suhu</th>
+          <th>Relay Aktif</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody">
+        <tr class="empty-row">
+          <td colspan="5">Belum ada data. Hubungkan ke MQTT terlebih dahulu.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div><!-- end .dashboard -->
+
+<!-- ===== LIBRARIES ===== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+<script>
+/* ============================================================
+   CONFIG — sesuaikan topic jika perlu
+   ============================================================ */
+const BROKER     = 'wss://broker.hivemq.com:8884/mqtt';
+const TOPIC_SUB  = 'smk/iot/control08';
+const TOPIC_SUHU = 'smk/iot/sensorsuhu08';
+const TOPIC_HUM  = 'smk/iot/sensorkelembaban08';
+const MAX_CHART  = 20;
+const MAX_HIST   = 100;
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let mqttClient  = null;
+let connected   = false;
+let mode        = 'manual';
+let relayStates = [false, false, false, false];
+let historyData = [];
+let chartMode   = 'suhu';
+let myChart     = null;
+let lastSuhu    = null;
+let lastHum     = null;
+let lastPush    = 0;
+let lastHist    = 0;
+
+const chartLabels = [];
+const chartSuhu   = [];
+const chartHum    = [];
+
+/* ============================================================
+   CLOCK
+   ============================================================ */
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function getTimeStr() {
+  const n = new Date();
+  return `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+}
+
+function updateClock() {
+  const n = new Date();
+  document.getElementById('clock').textContent =
+    `${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
+
+  const days   = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+  const months = ['Januari','Februari','Maret','April','Mei','Juni',
+                  'Juli','Agustus','September','Oktober','November','Desember'];
+  document.getElementById('datestr').textContent =
+    `${days[n.getDay()]}, ${n.getDate()} ${months[n.getMonth()]} ${n.getFullYear()}`;
+}
+
+setInterval(updateClock, 1000);
+updateClock();
+
+/* ============================================================
+   RELAY UI
+   ============================================================ */
+function buildRelayGrid() {
+  const grid = document.getElementById('relayGrid');
+  grid.innerHTML = '';
+  for (let i = 0; i < 4; i++) {
+    const on   = relayStates[i];
+    const card = document.createElement('div');
+    card.className = `relay-card${on ? ' on' : ''}`;
+    card.id = `relay-card-${i}`;
+    card.innerHTML = `
+      <div class="relay-label">RELAY ${i + 1}</div>
+      <div class="relay-indicator ${on ? 'on' : 'off'}" id="relay-ind-${i}"></div>
+      <div class="relay-state" style="color:${on ? 'var(--accent)' : 'var(--muted)'}" id="relay-state-${i}">
+        ${on ? 'ON' : 'OFF'}
+      </div>
+      <button class="relay-toggle${on ? ' on' : ''}" id="relay-btn-${i}"
+              onclick="toggleRelay(${i})" ${mode === 'auto' ? 'disabled' : ''}>
+        ${on ? 'Matikan' : 'Nyalakan'}
+      </button>
+    `;
+    grid.appendChild(card);
+  }
+}
+
+function updateRelayUI(i) {
+  const on    = relayStates[i];
+  const card  = document.getElementById(`relay-card-${i}`);
+  const ind   = document.getElementById(`relay-ind-${i}`);
+  const state = document.getElementById(`relay-state-${i}`);
+  const btn   = document.getElementById(`relay-btn-${i}`);
+
+  if (card)  card.className    = `relay-card${on ? ' on' : ''}`;
+  if (ind)   ind.className     = `relay-indicator ${on ? 'on' : 'off'}`;
+  if (state) {
+    state.textContent = on ? 'ON' : 'OFF';
+    state.style.color = on ? 'var(--accent)' : 'var(--muted)';
+  }
+  if (btn) {
+    btn.className   = `relay-toggle${on ? ' on' : ''}`;
+    btn.textContent = on ? 'Matikan' : 'Nyalakan';
+  }
+}
+
+function toggleRelay(i) {
+  if (mode === 'auto') return;
+  relayStates[i] = !relayStates[i];
+  const cmd = `R${i + 1}_${relayStates[i] ? 'ON' : 'OFF'}`;
+  if (connected && mqttClient) { mqttClient.publish(TOPIC_SUB, cmd); }
+  updateRelayUI(i);
+}
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('modeManual').className = `mode-btn${m === 'manual' ? ' active' : ''}`;
+  document.getElementById('modeAuto').className   = `mode-btn${m === 'auto'   ? ' active' : ''}`;
+  document.getElementById('autoNote').style.display = m === 'auto' ? 'block' : 'none';
+  buildRelayGrid();
+}
+
+function doReset() {
+  relayStates = [false, false, false, false];
+  for (let i = 0; i < 4; i++) {
+    if (connected && mqttClient) { mqttClient.publish(TOPIC_SUB, `R${i + 1}_OFF`); }
+    updateRelayUI(i);
+  }
+}
+
+/* ============================================================
+   MQTT
+   ============================================================ */
+function doConnect() {
+  const dot  = document.getElementById('statusDot');
+  const txt  = document.getElementById('statusText');
+  const info = document.getElementById('topicInfo');
+
+  dot.className   = 'status-dot';
+  txt.textContent = 'Menghubungkan...';
+  txt.className   = 'status-val connecting';
+  info.textContent = 'Mencoba terhubung ke broker.hivemq.com...';
+  document.getElementById('btnConnect').disabled    = true;
+  document.getElementById('btnDisconnect').disabled = true;
+
+  const clientId = 'web_' + Math.random().toString(16).slice(2, 10);
+  mqttClient = mqtt.connect(BROKER, { clientId, clean: true, reconnectPeriod: 0 });
+
+  mqttClient.on('connect', () => {
+    connected = true;
+    dot.className   = 'status-dot connected';
+    txt.textContent = 'Connected';
+    txt.className   = 'status-val connected';
+    info.textContent = `Terhubung · Sub: ${TOPIC_SUHU} · ${TOPIC_HUM}`;
+    document.getElementById('btnConnect').disabled    = true;
+    document.getElementById('btnDisconnect').disabled = false;
+    mqttClient.subscribe(TOPIC_SUHU);
+    mqttClient.subscribe(TOPIC_HUM);
+  });
+
+  mqttClient.on('message', (topic, payload) => {
+    const val = parseFloat(payload.toString());
+    if (topic === TOPIC_SUHU)     handleSuhu(val);
+    else if (topic === TOPIC_HUM) handleHum(val);
+  });
+
+  mqttClient.on('error', (err) => {
+    txt.textContent  = 'Error koneksi!';
+    txt.className    = 'status-val disconnected';
+    dot.className    = 'status-dot disconnected';
+    info.textContent = err.message ? err.message.slice(0, 60) : 'Koneksi gagal';
+    connected = false;
+    document.getElementById('btnConnect').disabled    = false;
+    document.getElementById('btnDisconnect').disabled = true;
+  });
+
+  mqttClient.on('close', () => {
+    if (!connected) return;
+    setDisconnected('Terputus dari broker');
+  });
+}
+
+function doDisconnect() {
+  if (mqttClient) { mqttClient.end(true); }
+  setDisconnected('Terputus secara manual');
+}
+
+function setDisconnected(msg) {
+  connected = false;
+  document.getElementById('statusDot').className    = 'status-dot disconnected';
+  document.getElementById('statusText').textContent = 'Disconnected';
+  document.getElementById('statusText').className   = 'status-val disconnected';
+  document.getElementById('topicInfo').textContent  = msg || 'Disconnected';
+  document.getElementById('btnConnect').disabled    = false;
+  document.getElementById('btnDisconnect').disabled = true;
+}
+
+/* ============================================================
+   SENSOR HANDLERS
+   ============================================================ */
+function handleSuhu(val) {
+  if (isNaN(val)) return;
+  lastSuhu = val;
+  const el    = document.getElementById('suhuVal');
+  const badge = document.getElementById('suhuBadge');
+  el.textContent = val.toFixed(1);
+
+  let cls, badgeCls, label;
+  if (val < 26.9) {
+    cls = 'sensor-val suhu-cool'; badgeCls = 'sensor-badge badge-cool'; label = 'Normal';
+    if (mode === 'auto') { relayStates[0] = false; updateRelayUI(0); }
+  } else if (val < 31) {
+    cls = 'sensor-val suhu-warm'; badgeCls = 'sensor-badge badge-warm'; label = 'Hangat';
+  } else {
+    cls = 'sensor-val suhu-hot'; badgeCls = 'sensor-badge badge-hot'; label = 'Panas!';
+    if (mode === 'auto') { relayStates[0] = true; updateRelayUI(0); }
+  }
+
+  el.className      = cls;
+  badge.className   = badgeCls;
+  badge.textContent = label;
+  tryPushData();
+}
+
+function handleHum(val) {
+  if (isNaN(val)) return;
+  lastHum = val;
+  document.getElementById('humVal').textContent = val.toFixed(1);
+  const badge = document.getElementById('humBadge');
+  if (val < 40) {
+    badge.className = 'sensor-badge badge-hot';  badge.textContent = 'Kering';
+  } else if (val < 70) {
+    badge.className = 'sensor-badge badge-cool'; badge.textContent = 'Normal';
+  } else {
+    badge.className = 'sensor-badge badge-warm'; badge.textContent = 'Lembap';
+  }
+  tryPushData();
+}
+
+function tryPushData() {
+  if (lastSuhu === null || lastHum === null) return;
+  const now = Date.now();
+  if (now - lastPush >= 3000) { lastPush = now; pushChart(lastSuhu, lastHum); }
+  if (now - lastHist >= 6000) { lastHist = now; pushHistory(lastSuhu, lastHum); }
+}
+
+/* ============================================================
+   CHART
+   ============================================================ */
+function pushChart(s, h) {
+  chartLabels.push(getTimeStr());
+  chartSuhu.push(+s.toFixed(1));
+  chartHum.push(+h.toFixed(1));
+  if (chartLabels.length > MAX_CHART) { chartLabels.shift(); chartSuhu.shift(); chartHum.shift(); }
+  updateChart();
+}
+
+function switchChart(m, el) {
+  chartMode = m;
+  document.querySelectorAll('.chart-tab').forEach(t => t.className = 'chart-tab');
+  el.className = 'chart-tab active';
+
+  const legends = {
+    suhu: '<span><span class="legend-dot" style="background:#f87171"></span>Suhu (°C)</span>',
+    hum:  '<span><span class="legend-dot" style="background:#38bdf8"></span>Kelembapan (%)</span>',
+    both: '<span><span class="legend-dot" style="background:#f87171"></span>Suhu (°C)</span>' +
+          '<span><span class="legend-dot" style="background:#38bdf8"></span>Kelembapan (%)</span>'
+  };
+  document.getElementById('chartLegend').innerHTML = legends[m];
+  updateChart();
+}
+
+function updateChart() {
+  if (!myChart) return;
+  myChart.data.labels           = [...chartLabels];
+  myChart.data.datasets[0].data = [...chartSuhu];
+  myChart.data.datasets[1].data = [...chartHum];
+  myChart.data.datasets[0].hidden = (chartMode === 'hum');
+  myChart.data.datasets[1].hidden = (chartMode === 'suhu');
+  myChart.update('none');
+}
+
+function initChart() {
+  const ctx = document.getElementById('sensorChart').getContext('2d');
+  myChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'Suhu (°C)',
+          data: [],
+          borderColor: '#f87171',
+          backgroundColor: 'rgba(248,113,113,0.07)',
+          borderWidth: 2,
+          pointRadius: 4,
+          pointBackgroundColor: '#f87171',
+          tension: 0.4,
+          fill: true,
+          spanGaps: true
+        },
+        {
+          label: 'Kelembapan (%)',
+          data: [],
+          borderColor: '#38bdf8',
+          backgroundColor: 'rgba(56,189,248,0.07)',
+          borderWidth: 2,
+          pointRadius: 4,
+          pointBackgroundColor: '#38bdf8',
+          tension: 0.4,
+          fill: true,
+          hidden: true,
+          spanGaps: true
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1a2236',
+          borderColor: 'rgba(99,179,237,0.25)',
+          borderWidth: 1,
+          titleColor: '#94a3b8',
+          bodyColor: '#e2e8f0',
+          padding: 10
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: '#64748b',
+            font: { size: 10, family: 'Space Mono' },
+            maxTicksLimit: 8,
+            maxRotation: 0
+          },
+          grid: { color: 'rgba(99,179,237,0.07)' }
+        },
+        y: {
+          ticks: { color: '#64748b', font: { size: 10 } },
+          grid: { color: 'rgba(99,179,237,0.07)' }
+        }
+      }
+    }
+  });
+}
+
+/* ============================================================
+   HISTORY
+   ============================================================ */
+function pushHistory(s, h) {
+  const relayOn = relayStates
+    .map((v, i) => v ? `R${i + 1}` : null)
+    .filter(Boolean).join(', ') || '—';
+  historyData.unshift({ time: getTimeStr(), suhu: s.toFixed(1), hum: h.toFixed(1), relay: relayOn });
+  if (historyData.length > MAX_HIST) historyData.pop();
+  renderHistory();
+}
+
+function renderHistory() {
+  const body = document.getElementById('historyBody');
+  if (historyData.length === 0) {
+    body.innerHTML = '<tr class="empty-row"><td colspan="5">Belum ada data.</td></tr>';
+    return;
+  }
+  body.innerHTML = historyData.slice(0, 30).map(d => {
+    const s = parseFloat(d.suhu);
+    let bCls, bLbl;
+    if (s < 26.9)     { bCls = 'badge badge-cool'; bLbl = 'Normal'; }
+    else if (s < 31)  { bCls = 'badge badge-warm'; bLbl = 'Hangat'; }
+    else              { bCls = 'badge badge-hot';  bLbl = 'Panas';  }
+    return `<tr>
+      <td>${d.time}</td>
+      <td>${d.suhu}</td>
+      <td>${d.hum}</td>
+      <td><span class="${bCls}">${bLbl}</span></td>
+      <td style="color:var(--accent)">${d.relay}</td>
+    </tr>`;
+  }).join('');
+}
+
+function clearHistory() { historyData = []; renderHistory(); }
+
+/* ============================================================
+   INIT
+   ============================================================ */
+buildRelayGrid();
+renderHistory();
+initChart();
+</script>
+</body>
+</html>
