@@ -520,11 +520,12 @@ body {
   .header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 8px;
   }
   .clock {
-    font-size: 20px;
+    font-size: 22px;
     text-align: left;
+    font-family: monospace;
   }
   .clock-date {
     text-align: left;
@@ -538,15 +539,17 @@ body {
   }
   .btn-row {
     width: 100%;
-    justify-content: flex-start;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
   }
   .btn {
     font-size: 12px;
-    padding: 7px 12px;
+    padding: 8px 6px;
+    text-align: center;
   }
 
-  /* Sensor cards: tetap 2 kolom tapi lebih kecil */
+  /* Sensor cards: 2 kolom */
   .sensor-grid {
     gap: 10px;
   }
@@ -554,10 +557,11 @@ body {
     padding: 14px 16px;
   }
   .sensor-val {
-    font-size: 36px;
+    font-size: 34px;
+    font-family: monospace;
   }
 
-  /* Relay grid: 2 kolom di tablet */
+  /* Relay grid: 2 kolom */
   .relay-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -569,43 +573,99 @@ body {
     padding: 10px;
   }
 
+  /* Header */
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
   .header-title {
-    font-size: 14px;
+    font-size: 15px;
+    font-family: monospace;
+  }
+  .clock {
+    font-size: 26px;
+    font-family: monospace;
+    text-align: left;
+  }
+  .clock-date {
+    text-align: left;
+    font-size: 11px;
   }
 
-  /* Status bar tombol full width */
-  .btn-row {
+  /* Status bar */
+  .status-bar {
     flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+  }
+  .status-info {
+    width: 100%;
+  }
+  .btn-row {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .btn-reset {
+    grid-column: 1 / -1;
   }
   .btn {
     width: 100%;
     text-align: center;
+    font-size: 13px;
+    padding: 10px 8px;
   }
 
-  /* Sensor cards: 1 kolom di HP kecil */
+  /* Sensor cards: 1 kolom */
   .sensor-grid {
     grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .sensor-card {
+    padding: 16px;
   }
   .sensor-val {
-    font-size: 42px;
+    font-size: 44px;
+    font-family: monospace;
+  }
+  .sensor-unit {
+    font-size: 20px;
   }
 
-  /* Relay grid: 2 kolom */
+  /* Relay: 2 kolom */
   .relay-grid {
     grid-template-columns: repeat(2, 1fr);
     gap: 8px;
   }
   .relay-card {
-    padding: 12px 8px;
+    padding: 14px 8px;
+  }
+  .relay-label {
+    font-family: monospace;
+  }
+  .relay-state {
+    font-family: monospace;
   }
 
-  /* Section header: wrap */
+  /* Section header */
   .section-header {
     flex-wrap: wrap;
     gap: 8px;
   }
   .section-title {
     width: 100%;
+  }
+  .mode-toggle {
+    width: 100%;
+    display: flex;
+  }
+  .mode-btn {
+    flex: 1;
+    text-align: center;
   }
 
   /* Chart tabs */
@@ -617,23 +677,20 @@ body {
     flex: 1;
     text-align: center;
     font-size: 11px;
-    padding: 6px 4px;
+    padding: 7px 4px;
   }
 
-  /* History table: font lebih kecil */
+  /* History table: scroll horizontal */
+  .history-section {
+    overflow-x: auto;
+  }
+  .history-table {
+    min-width: 400px;
+  }
   .history-table th,
   .history-table td {
-    padding: 6px 6px;
+    padding: 6px 8px;
     font-size: 10px;
-  }
-
-  /* Mode toggle full width */
-  .mode-toggle {
-    width: 100%;
-    display: flex;
-  }
-  .mode-btn {
-    flex: 1;
-    text-align: center;
+    font-family: monospace;
   }
 }
