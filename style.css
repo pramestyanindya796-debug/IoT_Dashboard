@@ -505,3 +505,135 @@ body {
   font-family: var(--font-body) !important;
   font-size: 13px !important;
 }
+
+/* ============================================================
+   RESPONSIVE — Mobile & Tablet
+   ============================================================ */
+
+/* Tablet (max 768px) */
+@media (max-width: 768px) {
+  .dashboard {
+    padding: 14px;
+  }
+
+  /* Header: stack vertikal */
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .clock {
+    font-size: 20px;
+    text-align: left;
+  }
+  .clock-date {
+    text-align: left;
+  }
+
+  /* Status bar: wrap ke bawah */
+  .status-bar {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+  .btn-row {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+  .btn {
+    font-size: 12px;
+    padding: 7px 12px;
+  }
+
+  /* Sensor cards: tetap 2 kolom tapi lebih kecil */
+  .sensor-grid {
+    gap: 10px;
+  }
+  .sensor-card {
+    padding: 14px 16px;
+  }
+  .sensor-val {
+    font-size: 36px;
+  }
+
+  /* Relay grid: 2 kolom di tablet */
+  .relay-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Mobile (max 480px) */
+@media (max-width: 480px) {
+  .dashboard {
+    padding: 10px;
+  }
+
+  .header-title {
+    font-size: 14px;
+  }
+
+  /* Status bar tombol full width */
+  .btn-row {
+    flex-direction: column;
+  }
+  .btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  /* Sensor cards: 1 kolom di HP kecil */
+  .sensor-grid {
+    grid-template-columns: 1fr;
+  }
+  .sensor-val {
+    font-size: 42px;
+  }
+
+  /* Relay grid: 2 kolom */
+  .relay-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .relay-card {
+    padding: 12px 8px;
+  }
+
+  /* Section header: wrap */
+  .section-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .section-title {
+    width: 100%;
+  }
+
+  /* Chart tabs */
+  .chart-tabs {
+    width: 100%;
+    display: flex;
+  }
+  .chart-tab {
+    flex: 1;
+    text-align: center;
+    font-size: 11px;
+    padding: 6px 4px;
+  }
+
+  /* History table: font lebih kecil */
+  .history-table th,
+  .history-table td {
+    padding: 6px 6px;
+    font-size: 10px;
+  }
+
+  /* Mode toggle full width */
+  .mode-toggle {
+    width: 100%;
+    display: flex;
+  }
+  .mode-btn {
+    flex: 1;
+    text-align: center;
+  }
+}
