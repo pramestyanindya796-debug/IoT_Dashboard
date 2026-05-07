@@ -217,6 +217,7 @@ function updateRelayUI(i) {
   if (btn) {
     btn.className   = `relay-toggle${on ? ' on' : ''}`;
     btn.textContent = on ? 'Matikan' : 'Nyalakan';
+    btn.disabled    = (mode === 'auto');
   }
 }
 
@@ -234,6 +235,11 @@ function setMode(m) {
   document.getElementById('modeAuto').className   = `mode-btn${m === 'auto'   ? ' active' : ''}`;
   document.getElementById('autoNote').style.display = m === 'auto' ? 'block' : 'none';
   buildRelayGrid();
+  // Pastikan semua tombol relay di-disable/enable sesuai mode
+  for (let i = 0; i < 4; i++) {
+    const btn = document.getElementById(`relay-btn-${i}`);
+    if (btn) btn.disabled = (m === 'auto');
+  }
 }
 
 function doReset() {
