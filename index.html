@@ -64,7 +64,7 @@
     </div>
     <div class="relay-grid" id="relayGrid"></div>
     <div class="auto-note" id="autoNote">
-      Mode Auto aktif: R1 nyala jika suhu 20-25°C · R2 nyala jika suhu 26-29°C · R3 nyala jika suhu ≥ 31°C
+      Mode Auto aktif: R1 nyala jika suhu ≤27°C · R2 nyala jika suhu 28-30°C · R3 nyala jika suhu ≥31°C
     </div>
   </div>
 
@@ -323,28 +323,22 @@ function handleSuhu(val) {
 
   let cls, badgeCls, label;
 
-  if (val >= 20 && val <= 25) {
-    cls = 'sensor-val suhu-cool'; badgeCls = 'sensor-badge badge-cool'; label = 'Sejuk (20-25C)';
+  if (val <= 27) {
+    cls = 'sensor-val suhu-cool'; badgeCls = 'sensor-badge badge-cool'; label = 'Sejuk (<=27C)';
     if (mode === 'auto') {
       relayStates[0] = true; relayStates[1] = false; relayStates[2] = false;
       mqttAutoUpdate();
     }
-  } else if (val >= 26 && val <= 29) {
-    cls = 'sensor-val suhu-warm'; badgeCls = 'sensor-badge badge-warm'; label = 'Hangat (26-29C)';
+  } else if (val >= 28 && val <= 30) {
+    cls = 'sensor-val suhu-warm'; badgeCls = 'sensor-badge badge-warm'; label = 'Hangat (28-30C)';
     if (mode === 'auto') {
       relayStates[0] = false; relayStates[1] = true; relayStates[2] = false;
       mqttAutoUpdate();
     }
   } else if (val >= 31) {
-    cls = 'sensor-val suhu-hot'; badgeCls = 'sensor-badge badge-hot'; label = 'Panas! (31C+)';
+    cls = 'sensor-val suhu-hot'; badgeCls = 'sensor-badge badge-hot'; label = 'Panas! (>=31C)';
     if (mode === 'auto') {
       relayStates[0] = false; relayStates[1] = false; relayStates[2] = true;
-      mqttAutoUpdate();
-    }
-  } else {
-    cls = 'sensor-val suhu-cool'; badgeCls = 'sensor-badge badge-cool'; label = 'Normal';
-    if (mode === 'auto') {
-      relayStates[0] = false; relayStates[1] = false; relayStates[2] = false;
       mqttAutoUpdate();
     }
   }
